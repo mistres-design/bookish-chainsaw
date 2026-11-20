@@ -1,14 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="./font.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Design &amp; Web Notes</title>
+  <link rel="stylesheet" href="./font.css">
+  <style>
+    .game-box {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .game-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .game-btn {
+      font-family: inherit;
+      font-weight: 300;
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .game-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    canvas#dotGame {
+      display: block;
+      width: 100%;
+      height: 180px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      cursor: crosshair;
+    }
+  </style>
 </head>
 <body>
   <h1>Personal Space</h1>
   <p>Hello! This is my public page with notes on design, layout, and personal web projects.</p>
   <p>Currently experimenting with static pages and simple front-end interfaces.</p>
+
+  <section class="game-box" aria-label="Mini game">
+    <div class="game-hud">
+      <span>Score: <strong id="scoreVal">0</strong> · Best: <strong id="bestVal">0</strong></span>
+      <button type="button" class="game-btn" id="startBtn">Start 15s Round</button>
+    </div>
+    <canvas id="dotGame"></canvas>
+  </section>
+
+  <script>
+    const canvas = document.getElementById("dotGame");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("scoreVal");
+    const bestEl = document.getElementById("bestVal");
+    const startBtn = document.getElementById("startBtn");
+
+    let score = 0;
+    let best = Number(localStorage.getItem("ps_best_score") || 0);
+    let timeLeft = 0;
+    let running = false;
+    let target = { x: 100, y: 90, r: 14 };
+    let timerId = null;
+
+    bestEl.textContent = best;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      placeTarget();
+      draw();
+    }
+
+    function placeTarget() {
+      const w = canvas.clientWidth || 600;
+      const h = canvas.clientHeight || 180;
+      const pad = 24;
+      target.x = pad + Math.random() * Math.max(20, w - pad * 2);
+      target.y = pad + Math.random() * Math.max(20, h - pad * 2);
+    }
+
+    function draw() {
+      const w = canvas.clientWidth || 600;
+      const h = canvas.clientHeight || 180;
+      ctx.clearRect(0, 0, w, h);
+
+      if (!running) {
+        ctx.font = "300 14px inherit";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          timeLeft === 0 && score > 0
+            ? `Round over — score: ${score}. Click "Start 15s Round" to play again.`
+            : 'Click "Start 15s Round" and catch the dots.',
+          w / 2,
+          h / 2 + 4
+        );
+        return;
+      }
+
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, target.r + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.16)";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, target.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+
+      ctx.font = "300 12px inherit";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.textAlign = "right";
+      ctx.fillText(`${timeLeft}s`, w - 12, 20);
+    }
+
+    function startRound() {
+      clearInterval(timerId);
+      score = 0;
+      timeLeft = 15;
+      running = true;
+      scoreEl.textContent = score;
+      startBtn.textContent = "Restart";
+      placeTarget();
+      draw();
+
+      timerId = setInterval(() => {
+        timeLeft -= 1;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          running = false;
+          clearInterval(timerId);
+          startBtn.textContent = "Start 15s Round";
+        }
+        draw();
+      }, 1000);
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!running) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const dist = Math.hypot(x - target.x, y - target.y);
+
+      if (dist <= target.r + 10) {
+        score += 1;
+        scoreEl.textContent = score;
+        if (score > best) {
+          best = score;
+          bestEl.textContent = best;
+          localStorage.setItem("ps_best_score", String(best));
+        }
+        placeTarget();
+        draw();
+      }
+    });
+
+    startBtn.addEventListener("click", startRound);
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+  </script>
 </body>
 </html>
